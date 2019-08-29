@@ -6,16 +6,28 @@ import android.accounts.AccountManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.net.Uri
+import android.os.AsyncTask
 
 
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.common.AccountPicker
+import com.google.api.client.extensions.android.http.AndroidHttp
+import com.google.api.client.googleapis.auth.oauth2.GoogleCredential
+import com.google.api.client.googleapis.json.GoogleJsonResponseException
+import com.google.api.client.json.gson.GsonFactory
+import com.google.api.services.vision.v1.Vision
+import com.google.api.services.vision.v1.model.*
 import kotlinx.android.synthetic.main.activity_main.*
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.util.*
 
 class MainActivity : AppCompatActivity() {
     private var accessToken: String? = null
@@ -41,7 +53,7 @@ class MainActivity : AppCompatActivity() {
          uploadImage(data.data)
      } else if (requestCode == REQUEST_CODE_PICK_ACCOUNT) {
          if (resultCode == RESULT_OK) {
-             val email = data.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
+             val email = data!!.getStringExtra(AccountManager.KEY_ACCOUNT_NAME)
              val am = AccountManager.get(this)
              val accounts = am.getAccountsByType(GoogleAuthUtil.GOOGLE_ACCOUNT_TYPE)
              for (account in accounts) {
@@ -128,5 +140,168 @@ fun getPhoto(){
         accessToken = token
         dispatchTakePictureIntent()
     }
+    fun uploadImage(uri: Uri?) {
+        if (uri != null) {
+            try {
+                val bitmap = resizeBitmap(
+                    MediaStore.Images.Media.getBitmap(contentResolver, uri)
+                )
+                callCloudVision(bitmap)
+                imageView.setImageBitmap(bitmap)
+            } catch (e: IOException) {
+                Log.e(LOG_TAG, e.message)
+            }
 
+        } else {
+            Log.e(LOG_TAG, "Null image was returned.")
+        }
+    }
+    fun resizeBitmap(bitmap: Bitmap): Bitmap {
+
+        val maxDimension = 1024
+        val originalWidth = bitmap.width
+        val originalHeight = bitmap.height
+        var resizedWidth = maxDimension
+        var resizedHeight = maxDimension
+
+        if (originalHeight > originalWidth) {
+            resizedHeight = maxDimension
+            resizedWidth =
+                (resizedHeight * originalWidth.toFloat() / originalHeight.toFloat()).toInt()
+        } else if (originalWidth > originalHeight) {
+            resizedWidth = maxDimension
+            resizedHeight =
+                (resizedWidth * originalHeight.toFloat() / originalWidth.toFloat()).toInt()
+        } else if (originalHeight == originalWidth) {
+            resizedHeight = maxDimension
+            resizedWidth = maxDimension
+        }
+        return Bitmap.createScaledBitmap(bitmap, resizedWidth, resizedHeight, false)
+    }
+
+    fun getBase64EncodedJpeg(bitmap: Bitmap): Image {
+        val image = Image()
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, byteArrayOutputStream)
+        val imageBytes = byteArrayOutputStream.toByteArray()
+        image.encodeContent(imageBytes)
+        return image
+    }
+
+    @Throws(IOException::class)
+    private fun callCloudVision(bitmap: Bitmap) {
+        resultTextView.setText("Retrieving results from cloud")
+
+        object : AsyncTask<Any, Void, String>() {
+            override fun doInBackground(vararg params: Any): String {
+                try {
+                    val credential = GoogleCredential().setAccessToken(accessToken)
+                    val httpTransport = AndroidHttp.newCompatibleTransport()
+                    val jsonFactory = GsonFactory.getDefaultInstance()
+
+                    val builder = Vision.Builder(httpTransport, jsonFactory, credential)
+                    val vision = builder.build()
+
+                    val featureList = ArrayList<Feature>()
+                    val labelDetection = Feature()
+                    labelDetection.type = "LABEL_DETECTION"
+                    labelDetection.maxResults = 10
+                    featureList.add(labelDetection)
+
+                    val textDetection = Feature()
+                    textDetection.type = "TEXT_DETECTION"
+                    textDetection.maxResults = 10
+                    featureList.add(textDetection)
+
+                    val landmarkDetection = Feature()
+                    landmarkDetection.type = "LANDMARK_DETECTION"
+                    landmarkDetection.maxResults = 10
+                    featureList.add(landmarkDetection)
+
+                    val imageList = ArrayList<AnnotateImageRequest>()
+                    val annotateImageRequest = AnnotateImageRequest()
+                    val base64EncodedImage = getBase64EncodedJpeg(bitmap)
+                    annotateImageRequest.image = base64EncodedImage
+                    annotateImageRequest.features = featureList
+                    imageList.add(annotateImageRequest)
+
+                    val batchAnnotateImagesRequest = BatchAnnotateImagesRequest()
+                    batchAnnotateImagesRequest.requests = imageList
+
+                    val annotateRequest = vision.images().annotate(batchAnnotateImagesRequest)
+                    // Due to a bug: requests to Vision API containing large images fail when GZipped.
+                    annotateRequest.disableGZipContent = true
+                    Log.d(LOG_TAG, "sending request")
+
+                    val response = annotateRequest.execute()
+                    return convertResponseToString(response)
+
+                } catch (e: GoogleJsonResponseException) {
+                    Log.e(LOG_TAG, "Request failed: " + e.content)
+                } catch (e: IOException) {
+                    Log.d(LOG_TAG, "Request failed: " + e.message)
+                }
+
+                return "Cloud Vision API request failed."
+            }
+
+            override fun onPostExecute(result: String) {
+                resultTextView.setText(result)
+            }
+        }.execute()
+    }
+    private fun convertResponseToString(response: BatchAnnotateImagesResponse): String {
+        val message = StringBuilder("Results:\n\n")
+        message.append("Labels:\n")
+        val labels = response.responses[0].labelAnnotations
+        if (labels != null) {
+            for (label in labels) {
+                message.append(
+                    String.format(
+                        Locale.getDefault(), "%.3f: %s",
+                        label.score, label.description
+                    )
+                )
+                message.append("\n")
+            }
+        } else {
+            message.append("nothing\n")
+        }
+
+        message.append("Texts:\n")
+        val texts = response.responses[0]
+            .textAnnotations
+        if (texts != null) {
+            for (text in texts) {
+                message.append(
+                    String.format(
+                        Locale.getDefault(), "%s: %s",
+                        text.locale, text.description
+                    )
+                )
+                message.append("\n")
+            }
+        } else {
+            message.append("nothing\n")
+        }
+
+        message.append("Landmarks:\n")
+        val landmarks = response.responses[0]
+            .landmarkAnnotations
+        if (landmarks != null) {
+            for (landmark in landmarks) {
+                message.append(
+                    String.format(
+                        Locale.getDefault(), "%.3f: %s",
+                        landmark.score, landmark.description
+                    )
+                )
+                message.append("\n")
+            }
+        } else {
+            message.append("nothing\n")
+        }
+
+        return message.toString()
+    }
 }
