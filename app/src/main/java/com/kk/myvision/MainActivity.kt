@@ -3,6 +3,8 @@ package com.kk.myvision
 import android.Manifest
 import android.accounts.Account
 import android.accounts.AccountManager
+import android.app.AlertDialog
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -13,6 +15,8 @@ import android.os.AsyncTask
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
+import android.view.Gravity
+import android.view.Window
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -49,6 +53,8 @@ class MainActivity : AppCompatActivity() {
      if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
          val imageBitmap = data!!.extras!!.get("data") as Bitmap
          imageView.setImageBitmap(imageBitmap)
+         callCloudVision(imageBitmap)
+        // getAuthToken()
      }else if (requestCode == REQUEST_GALLERY_IMAGE && resultCode == RESULT_OK && data != null) {
          uploadImage(data.data)
      } else if (requestCode == REQUEST_CODE_PICK_ACCOUNT) {
@@ -86,6 +92,7 @@ fun getPhoto(){
         ActivityCompat.requestPermissions(this,
             arrayOf(Manifest.permission.GET_ACCOUNTS),
             REQUEST_PERMISSIONS);
+        pickUserAccount()
     }
 }
 
@@ -138,7 +145,17 @@ fun getPhoto(){
     }
     fun onTokenReceived(token: String?) {
         accessToken = token
-        dispatchTakePictureIntent()
+      //  dispatchTakePictureIntent()
+    //    launchImagePicker()
+       this.runOnUiThread{
+           showDailog(
+               "Image"
+
+           )
+       }
+
+
+
     }
     fun uploadImage(uri: Uri?) {
         if (uri != null) {
@@ -246,6 +263,7 @@ fun getPhoto(){
             }
 
             override fun onPostExecute(result: String) {
+                Log.e("API_RESULT",result)
                 resultTextView.setText(result)
             }
         }.execute()
@@ -304,4 +322,45 @@ fun getPhoto(){
 
         return message.toString()
     }
+    private fun launchImagePicker() {
+        val intent = Intent()
+        intent.type = "image/*"
+        intent.action = Intent.ACTION_GET_CONTENT
+        startActivityForResult(
+            Intent.createChooser(intent, "Select an image"),
+            REQUEST_GALLERY_IMAGE
+        )
+    }
+
+    fun showDailog(
+        title: String
+
+    ) {
+        val items = arrayOf<CharSequence>("Capture", "Gallery","Cancel")
+        val builder = AlertDialog.Builder(this)
+       // val dialog = builder.create()
+        // builder.setTitle(title);
+        builder.setItems(items) { dialog, item ->
+            if (item == 0) {
+                dispatchTakePictureIntent()
+
+            } else if (item == 1) {
+              launchImagePicker()
+            } else if (item == 2) {
+                dialog.dismiss()
+            }
+        }
+
+       val dialog = builder.create()
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        val wmlp = dialog.window!!.attributes
+
+        wmlp.gravity = Gravity.CENTER
+        wmlp.x = 100   //x position
+        wmlp.y = 100   //y position
+
+        dialog.show()
+    }
+
+
 }
