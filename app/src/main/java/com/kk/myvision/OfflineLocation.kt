@@ -1,5 +1,6 @@
 package com.kk.myvision
 
+import android.Manifest
 import android.content.Context
 import android.os.Bundle
 import android.os.PersistableBundle
@@ -10,6 +11,7 @@ import android.R.string.cancel
 import android.content.DialogInterface
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.location.Location
 import android.provider.Settings
 import androidx.appcompat.app.AlertDialog
@@ -17,6 +19,8 @@ import android.widget.Toast
 import android.location.LocationListener
 import android.util.Log
 import android.widget.TextView
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
 /**
  * Created by KwikPay Android Team Pune on 27-09-2019.
@@ -54,6 +58,13 @@ public class OfflineLocation :AppCompatActivity() {
             setContentView(R.layout.offline_location)
         mContext = this
           tv_lat_long=findViewById<TextView>(R.id.tv_lat_long)
+        if (ContextCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                0x0)
+        }
         /*locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         locationManager!!.requestLocationUpdates(
             LocationManager.GPS_PROVIDER,
@@ -113,3 +124,24 @@ private val locationListener: LocationListener = object : LocationListener {
     override fun onProviderEnabled(provider: String) {}
     override fun onProviderDisabled(provider: String) {}
 }
+/*
+fun checkPermission() {
+    if (ContextCompat.checkSelfPermission(
+            mContext,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) != PackageManager.PERMISSION_GRANTED
+    ) {//Can add more as per requirement
+
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ),
+            123
+        )
+    }
+}*/
