@@ -22,14 +22,27 @@ import android.widget.TextView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
+import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.OnMapReadyCallback
+
+import com.google.android.gms.maps.SupportMapFragment
+
+
 /**
  * Created by KwikPay Android Team Pune on 27-09-2019.
  * Copyright (c) 2019 KwikPay Limited. All rights reserved.
  */
-public class OfflineLocation :AppCompatActivity() {
+public class OfflineLocation :AppCompatActivity() ,OnMapReadyCallback{
+
+
+    override fun onMapReady(p0: GoogleMap?) {
+     
+    }
+
     var locationManager: LocationManager? = null
     var mContext: Context? = null
     var tv_lat_long: TextView? = null
+
 
 /*
     override fun onLocationChanged(location: Location?) {
@@ -74,9 +87,16 @@ public class OfflineLocation :AppCompatActivity() {
         try {
             // Request location updates
             locationManager?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0L, 0f, locationListener);
+
+
         } catch(ex: SecurityException) {
             Log.d("OfflineLocation", "Security Exception, no location available");
         }
+        val mapFragment = supportFragmentManager
+            .findFragmentById(R.id.map) as SupportMapFragment?
+        mapFragment!!.getMapAsync(this)
+
+
     }
 
 
@@ -117,7 +137,10 @@ public class OfflineLocation :AppCompatActivity() {
 
 
 private val locationListener: LocationListener = object : LocationListener {
+
+
     override fun onLocationChanged(location: Location) {
+
      Log.e("LOCATION","" + location.longitude + ":" + location.latitude);
     }
     override fun onStatusChanged(provider: String, status: Int, extras: Bundle) {}

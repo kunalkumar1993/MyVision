@@ -21,7 +21,9 @@ android {
         }
     }
 }
-
+ext.supportVersion = "28.0.0"
+ext.playService = "15.0.1"
+ext.playServiceExtra = "15.0.2"
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation"org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
@@ -31,7 +33,14 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.2.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
+
     //noinspection GradleCompatible
+    implementation "com.google.android.gms:play-services-gcm:${playService}"
+    implementation "com.google.android.gms:play-services-auth:${playService}"
+    implementation "com.google.android.gms:play-services-maps:${playService}"
+    implementation 'com.google.maps.android:android-maps-utils:0.5+'
+    implementation "com.google.android.gms:play-services-location:${playService}"
+    implementation "com.google.android.gms:play-services-analytics:${playServiceExtra}"
     implementation 'com.android.support:appcompat-v7:23.4.0'
     implementation 'com.google.android.gms:play-services-base:9.0.2'
     implementation 'com.google.android.gms:play-services-auth:9.0.2'
